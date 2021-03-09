@@ -1,10 +1,7 @@
+const playBtn = document.getElementById('play')
+
 const AudioContext = window.AudioContext || window.webkitAudioContext;
 const audioContext = new AudioContext();
-
-
-
-
-
 
 const audio = new Audio()
 
@@ -13,21 +10,34 @@ function init() {
     audio.autoplay = false;
     audio.crossOrigin = "anonymous";
     audio.src = "https://s3.eu-west-2.amazonaws.com/nelsoncodepen/Audiobinger_-_The_Garden_State.mp3";
+    audio.addEventListener('canplay', connectAudioToContext)
 }
 
-const btn = document.getElementById('play')
-btn.addEventListener('click', function (e) {  
-    
-    audio.play()
-})
 
-function handleCanplay() {
-    // connect the audio element to the analyser node and the analyser node
-    // to the main Web Audio context
-    const source = context.createMediaElementSource(audio);
-    source.connect(splitter);
-    splitter.connect(context.destination);
-  }
+//Connecting the selected sound with the Web Audio API
+function connectAudioToContext(){
+    const track = audioContext.createMediaElementSource(audio);
+    track.connect(audioContext.destination);
+}
+
+
+playBtn.addEventListener('click', function (e) {
+    // check if context is in suspended state (autoplay policy)
+    if (audioContext.state === 'suspended') {
+        audioContext.resume();
+    }
+
+    // play or pause track depending on state
+    if (this.dataset.playing === 'false') {
+        audio.play();
+        this.dataset.playing = 'true';
+    } else if (this.dataset.playing === 'true') {
+        audio.pause();
+        this.dataset.playing = 'false';
+    }     
+}, false)
+
+
 
 
 

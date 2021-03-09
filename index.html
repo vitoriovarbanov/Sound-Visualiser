@@ -10,7 +10,7 @@
 <body onload="init()">
     <audio controls id="audio"></audio>
     <input id="audioFile" type="file" accept="Audio/*" capture />
-    <button id='play'>Play the audio</button>
+    <button id='play' data-playing="false" role="switch" aria-checked="false">Play/Pause the Audio</button>
 
     <script src="./main.js"></script>
 </body>
