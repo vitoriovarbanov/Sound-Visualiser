@@ -1,19 +1,28 @@
 const playBtn = document.getElementById('play')
 const volumeControl = document.getElementById('volume')
-let canvas = document.querySelector("canvas");
-let ctx = canvas.getContext("2d");
 
-const AudioContext = window.AudioContext || window.webkitAudioContext;
+//CANVAS GLOBAL SETTINGS///////
+let canvas = document.querySelector("canvas");
+let ctx = canvas.getContext("webgl");
+canvas.width = document.body.clientWidth;
+canvas.height = document.body.clientHeight;
+
+//WEB AUDIO API GLOBAL SETTINGS
+window.AudioContext = (
+    window.AudioContext ||
+    window.webkitAudioContext ||
+    null
+  );
 const audioContext = new AudioContext();
 const gainNode = audioContext.createGain();
 const analyser = audioContext.createAnalyser();
 analyser.fftSize = 256;
+analyser.smoothingTimeConstant = 0.8
 const bufferLength = analyser.frequencyBinCount;
 const dataArray = new Uint8Array(bufferLength);
 
 
 const audio = new Audio()
-
 function init() {
     audio.loop = false;
     audio.autoplay = false;
@@ -36,25 +45,32 @@ function draw() {
     requestAnimationFrame(draw)
     analyser.getByteFrequencyData(dataArray)
 
-    ctx.fillStyle = 'rgb(0, 0, 0)';
-    ctx.fillRect(0, 0, canvas.width/2 , canvas.height/2 );
+    // Set clear color to black, fully opaque
+    ctx.clearColor(0.0, 0.0, 0.0, 1.0);
+    // Clear the color buffer with specified clear color
+    ctx.clear(ctx.COLOR_BUFFER_BIT);
+
+    /* ctx.fillStyle = 'rgb(0, 0, 0)';
+    ctx.fillRect(0, 0, canvas.width , canvas.height);
+
+    var barWidth = (canvas.width / bufferLength) * 1.9;
+    var barHeight;
+    var x = 0;
+    for (var i = 0; i < bufferLength; i++) {
+        barHeight = dataArray[i] / 3;
+
+        ctx.fillStyle = 'rgb(' + (barHeight + 100) + ',50,50)';
+        ctx.fillRect(x, canvas.height - barHeight / 2, barWidth, barHeight);
+
+        x += barWidth + 1;
+    } */
 
 }
 
 draw()
 
 
-
-
-
-
-
-
-
-
-
-
-
+//AUDIO RELATED STUFF TO GAIN CONTROL OVER THE PLAYING TRACK /////////
 
 //Add play/pause functionality
 playBtn.addEventListener('click', function (e) {
