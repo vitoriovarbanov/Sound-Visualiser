@@ -1,7 +1,9 @@
 const playBtn = document.getElementById('play')
+const volumeControl = document.getElementById('volume')
 
 const AudioContext = window.AudioContext || window.webkitAudioContext;
 const audioContext = new AudioContext();
+const gainNode = audioContext.createGain();
 
 const audio = new Audio()
 
@@ -17,10 +19,11 @@ function init() {
 //Connecting the selected sound with the Web Audio API
 function connectAudioToContext(){
     const track = audioContext.createMediaElementSource(audio);
-    track.connect(audioContext.destination);
+     // attach gainNode to be albe to control the volume
+    track.connect(gainNode).connect(audioContext.destination)
 }
 
-
+//Add play/pause functionality
 playBtn.addEventListener('click', function (e) {
     // check if context is in suspended state (autoplay policy)
     if (audioContext.state === 'suspended') {
@@ -36,6 +39,17 @@ playBtn.addEventListener('click', function (e) {
         this.dataset.playing = 'false';
     }     
 }, false)
+
+//Adjust volume
+volumeControl.addEventListener('input', function(){
+    gainNode.gain.value = this.value
+})
+
+
+//Handle the track when it's finished
+audio.addEventListener('ended', () => {
+    playBtn.dataset.playing = 'false';
+}, false);
 
 
 

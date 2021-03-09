@@ -8,10 +8,10 @@
 </head>
 
 <body onload="init()">
-    <audio controls id="audio"></audio>
-    <input id="audioFile" type="file" accept="Audio/*" capture />
+    <!-- <audio controls id="audio"></audio>
+    <input id="audioFile" type="file" accept="Audio/*" capture /> -->
     <button id='play' data-playing="false" role="switch" aria-checked="false">Play/Pause the Audio</button>
-
+    <input type="range" id="volume" min="0" max="2" value="1" step="0.01">
     <script src="./main.js"></script>
 </body>
 
