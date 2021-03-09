@@ -1,5 +1,11 @@
-var SAMPLES = 2048
-let audioCtx;
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+const audioContext = new AudioContext();
+
+
+
+
+
+
 const audio = new Audio()
 
 function init() {
@@ -7,16 +13,21 @@ function init() {
     audio.autoplay = false;
     audio.crossOrigin = "anonymous";
     audio.src = "https://s3.eu-west-2.amazonaws.com/nelsoncodepen/Audiobinger_-_The_Garden_State.mp3";
-    //audio.play()
 }
 
 const btn = document.getElementById('play')
 btn.addEventListener('click', function (e) {  
     
-    //audio.play()
+    audio.play()
 })
 
-
+function handleCanplay() {
+    // connect the audio element to the analyser node and the analyser node
+    // to the main Web Audio context
+    const source = context.createMediaElementSource(audio);
+    source.connect(splitter);
+    splitter.connect(context.destination);
+  }
 
 
 
