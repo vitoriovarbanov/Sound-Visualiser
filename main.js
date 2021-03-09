@@ -1,9 +1,16 @@
 const playBtn = document.getElementById('play')
 const volumeControl = document.getElementById('volume')
+let canvas = document.querySelector("canvas");
+let ctx = canvas.getContext("2d");
 
 const AudioContext = window.AudioContext || window.webkitAudioContext;
 const audioContext = new AudioContext();
 const gainNode = audioContext.createGain();
+const analyser = audioContext.createAnalyser();
+analyser.fftSize = 256;
+const bufferLength = analyser.frequencyBinCount;
+const dataArray = new Uint8Array(bufferLength);
+
 
 const audio = new Audio()
 
@@ -17,11 +24,37 @@ function init() {
 
 
 //Connecting the selected sound with the Web Audio API
-function connectAudioToContext(){
+function connectAudioToContext() {
     const track = audioContext.createMediaElementSource(audio);
-     // attach gainNode to be albe to control the volume
-    track.connect(gainNode).connect(audioContext.destination)
+    // attach gainNode to be albe to control the volume
+    track.connect(analyser)
+    analyser.connect(gainNode)
+    gainNode.connect(audioContext.destination)
 }
+
+function draw() {
+    requestAnimationFrame(draw)
+    analyser.getByteFrequencyData(dataArray)
+
+    ctx.fillStyle = 'rgb(0, 0, 0)';
+    ctx.fillRect(0, 0, canvas.width/2 , canvas.height/2 );
+
+}
+
+draw()
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 //Add play/pause functionality
 playBtn.addEventListener('click', function (e) {
@@ -37,11 +70,11 @@ playBtn.addEventListener('click', function (e) {
     } else if (this.dataset.playing === 'true') {
         audio.pause();
         this.dataset.playing = 'false';
-    }     
+    }
 }, false)
 
 //Adjust volume
-volumeControl.addEventListener('input', function(){
+volumeControl.addEventListener('input', function () {
     gainNode.gain.value = this.value
 })
 
