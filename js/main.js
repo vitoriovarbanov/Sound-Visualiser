@@ -2,10 +2,13 @@ const playBtn = document.getElementById('play')
 const volumeControl = document.getElementById('volume')
 
 //CANVAS GLOBAL SETTINGS///////
-let canvas = document.querySelector("canvas");
+let canvas = document.querySelector("#canvas");
 let ctx = canvas.getContext("2d");
-canvas.width = document.body.clientWidth;
-canvas.height = document.body.clientHeight;
+canvas.width = window.innerWidth
+canvas.height = window.innerHeight
+let radius = window.innerWidth <= 425 ? 120 : 160;
+let positionX = canvas.width/2;
+let positionY = canvas.height/2;
 
 
 //WEB AUDIO API GLOBAL SETTINGS
@@ -13,7 +16,7 @@ window.AudioContext = (
     window.AudioContext ||
     window.webkitAudioContext ||
     null
-  );
+);
 const audioContext = new AudioContext();
 const gainNode = audioContext.createGain();
 const analyser = audioContext.createAnalyser();
@@ -41,11 +44,17 @@ function connectAudioToContext() {
     gainNode.connect(audioContext.destination)
 }
 
- function draw() {
+function draw() {
     requestAnimationFrame(draw)
-    analyser.getByteFrequencyData(dataArray)
+    //analyser.getByteFrequencyData(dataArray)
+    analyser.getByteTimeDomainData(dataArray)
+    radius += 0.01;
+    ctx.fillStyle = 'blue'
+    ctx.beginPath()
+    ctx.arc(positionX, positionY, radius, 0, Math.PI * 2)
+    ctx.closePath();
+    ctx.fill();
 
-    
 
 }
 
@@ -82,5 +91,4 @@ volumeControl.addEventListener('input', function () {
 audio.addEventListener('ended', () => {
     playBtn.dataset.playing = 'false';
 }, false);
-
 
