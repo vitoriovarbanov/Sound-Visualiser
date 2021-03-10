@@ -9,6 +9,7 @@ canvas.height = window.innerHeight
 let radius = window.innerWidth <= 425 ? 120 : 160;
 let positionX = canvas.width/2;
 let positionY = canvas.height/2;
+let angle = 0;
 
 
 //WEB AUDIO API GLOBAL SETTINGS
@@ -44,18 +45,27 @@ function connectAudioToContext() {
     gainNode.connect(audioContext.destination)
 }
 
-function draw() {
-    requestAnimationFrame(draw)
-    //analyser.getByteFrequencyData(dataArray)
-    analyser.getByteTimeDomainData(dataArray)
-    radius += 0.01;
+function drawShapes(){
     ctx.fillStyle = 'blue'
     ctx.beginPath()
     ctx.arc(positionX, positionY, radius, 0, Math.PI * 2)
     ctx.closePath();
     ctx.fill();
+}
 
+function draw() {
+    requestAnimationFrame(draw)
+    analyser.getByteFrequencyData(dataArray)
+    //analyser.getByteTimeDomainData(dataArray)
 
+    ctx.clearRect(0,0,canvas.width,canvas.height)
+    //radius += 0.01;
+    angle += 0.1;
+    positionX += 5 * Math.sin(angle)
+    positionY += 1 * Math.cos(angle)
+    
+    
+    drawShapes()    
 }
 
 draw()
