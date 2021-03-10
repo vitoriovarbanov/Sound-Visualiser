@@ -75,16 +75,16 @@ function drawShapes() {
 
 }
 
-function drawLine() {
+function drawLines() {
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.setLineDash([1,3])
     ctx.lineTo(0, canvas.height);
     ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(canvas.height, 0);
+    ctx.moveTo(canvas.width, canvas.height);
     ctx.setLineDash([1,3])
-    ctx.lineTo(0, 0);
+    ctx.lineTo(canvas.width, 0);
     ctx.stroke();
 }
 
@@ -100,7 +100,7 @@ function draw() {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     drawShapes()
-    drawLine()
+    drawLines()
 }
 
 
@@ -135,6 +135,7 @@ audio.addEventListener('ended', () => {
     playBtn.dataset.playing = 'false';
 }, false);
 
+let showHideMenu = document.getElementById('container');
 
 
 //function drawShapes(){
