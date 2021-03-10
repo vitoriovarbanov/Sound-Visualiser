@@ -1,15 +1,16 @@
 const playBtn = document.getElementById('play')
 const volumeControl = document.getElementById('volume')
+let interval = 10;
 
 //CANVAS GLOBAL SETTINGS///////
 let canvas = document.querySelector("#canvas");
 let ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth
 canvas.height = window.innerHeight
-let radius = window.innerWidth <= 425 ? 120 : 160;
-let positionX = canvas.width/2;
-let positionY = canvas.height/2;
-let angle = 0;
+//let radius = window.innerWidth <= 425 ? 120 : 160;
+let positionX// = canvas.width/2;
+let positionY// = canvas.height/2;
+
 
 
 //WEB AUDIO API GLOBAL SETTINGS
@@ -32,7 +33,8 @@ function init() {
     audio.loop = false;
     audio.autoplay = false;
     audio.crossOrigin = "anonymous";
-    audio.src = "https://s3.eu-west-2.amazonaws.com/nelsoncodepen/Audiobinger_-_The_Garden_State.mp3";
+    audio.src = './assets/test.mp3'
+    //audio.src = "https://s3.eu-west-2.amazonaws.com/nelsoncodepen/Audiobinger_-_The_Garden_State.mp3";
     audio.addEventListener('canplay', connectAudioToContext)
 }
 
@@ -45,30 +47,55 @@ function connectAudioToContext() {
     gainNode.connect(audioContext.destination)
 }
 
-function drawShapes(){
-    ctx.fillStyle = 'blue'
+let number = 0;
+let scale = 10;
+let angle = 0 
+let bars = 100;
+let bar_width = (canvas.width/bufferLength)* 1;
+
+function drawShapes() {
+    //let angle = number * 1;
+    //let radius = scale * Math.sqrt(number);
+    positionX = 25 * Math.sin(angle) + canvas.width / 2;
+    positionY = 25 * Math.cos(angle) + canvas.height / 2;
+    //angle += 0.1
+
+     for (let i = 0; i < interval; i++) {
+         ctx.lineWidth = dataArray[i] * 1;
+         //ctx.lineWidth = ((dataArray[i] - 128) * 10) + 2;
+         ctx.fillStyle = "rgb(" + ((2/3)*(ctx.lineWidth)) + "," + (0*(ctx.lineWidth)) + "," + (0*(ctx.lineWidth)) + ")";
+    } 
+
+
+
+    //ctx.fillStyle = 'blue'
+    ctx.strokeStyle = 'wheat';
+    //ctx.lineWidth = 40;
+    ctx.setLineDash([5, 15, 20]);
+    ctx.lineJoin = 'round';
     ctx.beginPath()
-    ctx.arc(positionX, positionY, radius, 0, Math.PI * 2)
-    ctx.closePath();
+    ctx.arc(positionX, positionY, 200, 0, Math.PI * 2)
+    //ctx.closePath();
     ctx.fill();
+    ctx.stroke();
+
+    number++;     
+
 }
 
 function draw() {
     requestAnimationFrame(draw)
     analyser.getByteFrequencyData(dataArray)
-    //analyser.getByteTimeDomainData(dataArray)
 
-    ctx.clearRect(0,0,canvas.width,canvas.height)
-    //radius += 0.01;
-    angle += 0.1;
-    positionX += 5 * Math.sin(angle)
-    positionY += 1 * Math.cos(angle)
-    
-    
-    drawShapes()    
+    ctx.clearRect(0, 0, canvas.width, canvas.height) 
+    var gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, "rgba(151,233,208,1");
+    gradient.addColorStop(1, "rgba(35,192,199,1)");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    drawShapes()
 }
-
-draw()
 
 
 
@@ -85,6 +112,7 @@ playBtn.addEventListener('click', function (e) {
     if (this.dataset.playing === 'false') {
         audio.play();
         this.dataset.playing = 'true';
+        draw()
     } else if (this.dataset.playing === 'true') {
         audio.pause();
         this.dataset.playing = 'false';
@@ -102,3 +130,39 @@ audio.addEventListener('ended', () => {
     playBtn.dataset.playing = 'false';
 }, false);
 
+
+
+//function drawShapes(){
+
+///////////////////////////////////////////////////////
+       /*  let positionX = canvas.width / 2;
+    let positionY = canvas.height / 2;
+
+    for (var i = 0; i < bars; i++) {
+        //divide a circle into equal parts
+        rads = Math.PI * 2 / bars;
+        bar_height = dataArray[i] * 0.2;
+         // set coordinates
+        x = positionX + Math.cos(rads * i) * (radius);
+        y = positionY + Math.sin(rads * i) * (radius);
+        x_end = positionX + Math.cos(rads * i) * (radius + bar_height);
+        y_end = positionY + Math.sin(rads * i) * (radius + bar_height);
+        //draw a bar
+        drawBar(x, y, x_end, y_end, bar_width, dataArray[i]);
+
+    }
+ */
+//}
+
+/* function drawBar(x1, y1, x2, y2, width, frequency) {
+
+    var lineColor = "rgb(" + frequency + ", " + frequency + ", " + 205 + ")";
+
+    ctx.strokeStyle = lineColor;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+}
+ */
