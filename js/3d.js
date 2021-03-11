@@ -10,7 +10,29 @@ function main() {
     renderer.setSize(window.innerWidth, window.innerHeight)
     document.body.appendChild(renderer.domElement)
 
-    const geometry = new THREE.SphereGeometry()
+    let dataArray = [];
+    const fftSize = 2048
+    const listener = new THREE.AudioListener()
+    camera.add(listener)
+    const sound = new THREE.Audio(listener)
+    const audioLoader = new THREE.AudioLoader()
+    audioLoader.load('../assets/test.mp3', function (buffer) {
+        sound.setBuffer(buffer);
+        sound.crossOrigin = "anonymous";
+        sound.setVolume(1)
+        sound.play()
+    })
+
+    const analyser = new THREE.AudioAnalyser(sound, fftSize);
+    dataArray = analyser.data
+
+
+    let radius = 0.15;
+    let sides = 100;
+    let coils = 555;
+    let rotation = 0 //('0'=no rotation, '1'=360 degrees, '180/360'=180 degrees)
+
+    const geometry = new THREE.SphereGeometry(radius)
 
     const spheres = [
         makeInstances(geometry, 0x44aa88, -6),
@@ -18,22 +40,56 @@ function main() {
         makeInstances(geometry, 0x44aa88, 6)
     ]
 
-    function makeInstances(geometry, color, pos) {
+    function makeInstances(geometry, color, posX, posY) {
         const material = new THREE.MeshBasicMaterial({ color })
         const sphere = new THREE.Mesh(geometry, material)
 
-        sphere.position.x = pos;
+        sphere.position.x = posX;
+        sphere.position.y = posY;
         scene.add(sphere)
-
         return sphere
     }
 
+    //let centerX = 0;
+    //let centerY = 0;
+
+    function setBlockDisposition(centerX, centerY, radius, sides, coils, rotation) {
+        //
+        // How far to step away from center for each side.
+        var awayStep = radius / sides;
+        //
+        // How far to rotate around center for each side.
+        var aroundStep = coils / sides;// 0 to 1 based.
+        //
+        // Convert aroundStep to radians.
+        var aroundRadians = aroundStep * 2 * Math.PI;
+        //
+        // Convert rotation to radians.
+        rotation *= 2 * Math.PI;
+        //
+        // For every side, step around and away from center.
+        for (var i = 1; i <= sides; i++) {
+            //
+            // How far away from center
+            var away = i * awayStep;
+            //
+            // How far around the center.
+            var around = i * aroundRadians + rotation;
+            //
+            // Convert 'around' and 'away' to X and Y.
+            var x = centerX + Math.cos(around) * away * 50;
+            var y = centerY + Math.sin(around) * away * 50;
+            //
+            // Now that you know it, do it.
+            //doSome(x,y)
+            makeInstances(geometry, 0x44aa88, x, y);
+        }
+    }
+
+
 
     function animate() {
-        spheres.forEach(el => {
-            el.rotation.x += 0.01;
-            el.rotation.y += 0.01;
-        })
+        setBlockDisposition(0, 0, radius, sides, coils, 0)
 
         renderer.render(scene, camera);
         requestAnimationFrame(animate);
