@@ -1,0 +1,14 @@
+{
+  "name": "sound-visualiser",
+  "version": "1.0.0",
+  "description": "Browser-based audio visualiser using the Web Audio API and Three.js",
+  "scripts": {
+    "dev": "live-server"
+  },
+  "dependencies": {
+    "three": "0.126.1"
+  },
+  "devDependencies": {
+    "live-server": "^1.2.2"
+  }
+}
