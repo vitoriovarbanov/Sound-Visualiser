@@ -60,6 +60,55 @@ canvas {
 .head .label.red { color: var(--red); }
 .head .label.ink { color: var(--ink); font-variant-numeric: tabular-nums; }
 
+.head-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+}
+
+/* .player is pointer-events:none, so interactive children opt back in */
+.open {
+    pointer-events: auto;
+    border: 1px solid var(--ink);
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 7px 13px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.open:hover { background: var(--ink); color: var(--cream); }
+.open:focus-visible { outline: 2px solid var(--red); outline-offset: 3px; }
+
+/* drag-and-drop target — inert until a file is dragged over the window */
+.drop {
+    position: fixed;
+    inset: 0;
+    z-index: 3;
+    display: grid;
+    place-items: center;
+    background: rgba(242, 240, 234, 0.92);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.15s;
+}
+.drop.on { opacity: 1; visibility: visible; }
+.drop span {
+    border: 2px dashed var(--red);
+    color: var(--red);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    padding: 60px 80px;
+}
+
 .masthead {
     margin: 22px 0 0;
     font-weight: 800;

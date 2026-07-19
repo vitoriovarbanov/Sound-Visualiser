@@ -1,4 +1,4 @@
-import * as THREE from '../node_modules/three/src/Three.js';
+import * as THREE from 'three';
 
 function main() {
     const scene = new THREE.Scene()
@@ -17,18 +17,23 @@ function main() {
     const redColor = new THREE.Color(0xe5352b);
 
     const fftSize = 2048
-    const listener = new THREE.AudioListener()
-    camera.add(listener)
-    const sound = new THREE.Audio(listener)
-    const audioLoader = new THREE.AudioLoader()
 
-    // ---- transport state ----
-    const audioCtx = listener.context;
-    let ready = false;
-    let duration = 0;
-    let playing = false;
-    let position = 0;    // playhead (s) when not actively counting
-    let startedAt = 0;   // audioCtx time when the current play segment began
+    // Stream through an <audio> element instead of THREE.AudioLoader, which fetches the
+    // whole file and decodes it to raw PCM up front (~10MB per minute of stereo, and no
+    // sound until the last byte lands). The element also owns the playhead, so its
+    // `currentTime`/`duration` replace all manual transport bookkeeping.
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const el = new Audio();
+    el.crossOrigin = 'anonymous';
+    el.preload = 'metadata';
+
+    // createMediaElementSource may only be called once per element, so the graph is wired
+    // up front — loading another track just swaps `el.src` and the routing still holds.
+    const analyserNode = audioCtx.createAnalyser();
+    analyserNode.fftSize = fftSize;
+    audioCtx.createMediaElementSource(el).connect(analyserNode);
+    analyserNode.connect(audioCtx.destination);
+    const freqData = new Uint8Array(analyserNode.frequencyBinCount);
 
     // ---- transport controls (Swiss player in index.html) ----
     const player = document.getElementById('player');
@@ -38,73 +43,114 @@ function main() {
     const knob = document.getElementById('knob');
     const curEl = document.getElementById('cur');
     const totEl = document.getElementById('tot');
+    const titleEl = document.getElementById('title');
+    const srcEl = document.getElementById('src');
+    const openBtn = document.getElementById('open');
+    const fileInput = document.getElementById('file');
+    const dropEl = document.getElementById('drop');
 
     const fmt = (s) => {
         s = Math.max(0, Math.floor(s || 0));
         return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
     };
-    // Live playhead: add the elapsed context time while a segment is playing.
-    const headPos = () => {
-        const p = playing ? position + (audioCtx.currentTime - startedAt) : position;
-        return Math.max(0, Math.min(duration, p));
-    };
-
-    audioLoader.load('../assets/test.mp3', function (buffer) {
-        sound.setBuffer(buffer);
-        sound.setVolume(1);
-        duration = buffer.duration;
-        totEl.textContent = fmt(duration);
-        ready = true;
-        pp.disabled = false;
-    })
+    // Streams and some VBR mp3s report Infinity/NaN until enough has buffered.
+    const dur = () => (isFinite(el.duration) ? el.duration : 0);
 
     function setPlaying(state) {
-        playing = state;
         player.classList.toggle('is-playing', state);
         pp.setAttribute('aria-label', state ? 'Pause' : 'Play');
     }
 
-    // Always stop() before starting so THREE.Audio's internal progress resets to 0
-    // and `sound.offset` alone sets the start point — our `position` stays the single
-    // source of truth for the playhead. The first click also satisfies the browser
-    // autoplay policy by resuming the suspended AudioContext.
-    function play() {
-        if (!ready) return;
+    el.addEventListener('loadedmetadata', () => {
+        totEl.textContent = fmt(dur());
+        pp.disabled = false;
+    });
+    el.addEventListener('play', () => setPlaying(true));
+    el.addEventListener('pause', () => setPlaying(false));
+    el.addEventListener('ended', () => { el.currentTime = 0; });
+
+    // The first click doubles as the user gesture that unblocks the AudioContext.
+    pp.addEventListener('click', () => {
         if (audioCtx.state === 'suspended') audioCtx.resume();
-        if (position >= duration) position = 0;
-        try { sound.stop(); } catch (e) { /* no source yet */ }
-        sound.offset = position;
-        sound.play();
-        startedAt = audioCtx.currentTime;
-        setPlaying(true);
-    }
-
-    function pause() {
-        position = headPos();
-        try { sound.stop(); } catch (e) { /* already stopped */ }
-        setPlaying(false);
-    }
-
-    pp.addEventListener('click', () => (playing ? pause() : play()));
+        if (el.paused) el.play(); else el.pause();
+    });
 
     // Click the hairline to scrub.
     seek.addEventListener('click', (e) => {
-        if (!ready) return;
+        if (!dur()) return;
         const r = seek.getBoundingClientRect();
-        position = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) * duration;
-        if (playing) play();   // restart from the new position
-        else updateTransport();
+        el.currentTime = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) * dur();
+        updateTransport();
     });
 
     function updateTransport() {
-        const p = headPos();
-        const ratio = duration ? p / duration : 0;
+        const ratio = dur() ? el.currentTime / dur() : 0;
         fill.style.width = (ratio * 100) + '%';
         knob.style.left = (ratio * 100) + '%';
-        curEl.textContent = fmt(p);
+        curEl.textContent = fmt(el.currentTime);
     }
 
-    const analyser = new THREE.AudioAnalyser(sound, fftSize);
+    // ---- track loading ----
+    // Split "foo.mp3" across two lines the way the masthead sets the default track.
+    function setTitle(name, source) {
+        const dot = name.lastIndexOf('.');
+        titleEl.textContent = '';   // .append() keeps arbitrary file names out of innerHTML
+        titleEl.append(
+            dot > 0 ? name.slice(0, dot) : name,
+            document.createElement('br'),
+            dot > 0 ? name.slice(dot) : ''
+        );
+        srcEl.textContent = source;
+    }
+
+    let objectUrl = null;
+    function loadTrack(src, name, source) {
+        // Revoke the previous blob so dropping track after track doesn't leak them.
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+        objectUrl = src.startsWith('blob:') ? src : null;
+        pp.disabled = true;
+        el.src = src;
+        setTitle(name, source);
+        updateTransport();
+    }
+
+    function loadFile(file) {
+        if (!file || !file.type.startsWith('audio/')) return;
+        loadTrack(URL.createObjectURL(file), file.name, 'Local file');
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        el.play();   // a drop or picker choice is itself the required user gesture
+    }
+
+    openBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => {
+        loadFile(fileInput.files[0]);
+        fileInput.value = '';   // so re-picking the same file fires 'change' again
+    });
+
+    // Drag-and-drop anywhere on the page. dragenter/dragleave fire per descendant, so
+    // count depth rather than toggling on the first leave.
+    let dragDepth = 0;
+    window.addEventListener('dragover', (e) => e.preventDefault());
+    window.addEventListener('dragenter', (e) => {
+        e.preventDefault();
+        if (++dragDepth === 1) dropEl.classList.add('on');
+    });
+    window.addEventListener('dragleave', () => {
+        if (--dragDepth <= 0) { dragDepth = 0; dropEl.classList.remove('on'); }
+    });
+    window.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dragDepth = 0;
+        dropEl.classList.remove('on');
+        loadFile(e.dataTransfer.files[0]);
+    });
+
+    // Opus is ~1/3 the size of the mp3, but Safari below 15 can't decode it. canPlayType
+    // returns 'probably' / 'maybe' / '' — the empty string is the only falsy answer.
+    const defaultTrack = el.canPlayType('audio/webm; codecs=opus')
+        ? 'visualise.webm'
+        : 'visualise.mp3';
+    loadTrack('./assets/' + defaultTrack, defaultTrack, 'Track 01 / 01');
 
     // FFT bins are spaced linearly but hearing is logarithmic, so a linear map
     // crams every musical detail into the first handful of spheres. Precompute a
@@ -168,9 +214,9 @@ function main() {
     function animate() {
         requestAnimationFrame(animate);
 
-        // Sample the live frequency spectrum every frame. AudioAnalyser.getFrequencyData()
-        // fills and returns the byte-frequency array (0..255 per bin).
-        const data = analyser.getFrequencyData();
+        // Sample the live frequency spectrum every frame, reusing one array (0..255 per bin).
+        analyserNode.getByteFrequencyData(freqData);
+        const data = freqData;
 
         for (let j = 0; j < bars.length; j++) {
             // Average this bar's log-spaced band, then normalise to 0..1.
@@ -189,12 +235,6 @@ function main() {
             bar.material.color.copy(inkColor).lerp(redColor, Math.min(1, s * s * 1.8));
         }
 
-        // Reached the end — reset to the start, paused.
-        if (playing && headPos() >= duration - 0.03) {
-            try { sound.stop(); } catch (e) { /* already stopped */ }
-            position = 0;
-            setPlaying(false);
-        }
         updateTransport();
 
         renderer.render(scene, camera);

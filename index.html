@@ -12,9 +12,13 @@
       <div class="top">
         <div class="head">
           <p class="label red">Sound Visualiser</p>
-          <p class="label ink">Track 01 / 01</p>
+          <div class="head-right">
+            <p class="label ink" id="src">Track 01 / 01</p>
+            <button class="open" id="open">Open file</button>
+            <input type="file" id="file" accept="audio/*" hidden />
+          </div>
         </div>
-        <h1 class="masthead">test<br />.mp3</h1>
+        <h1 class="masthead" id="title">visualise<br />.mp3</h1>
       </div>
 
       <div class="foot">
@@ -34,6 +38,11 @@
       </div>
     </div>
 
+    <div class="drop" id="drop"><span>Drop an audio file</span></div>
+
+    <script type="importmap">
+      { "imports": { "three": "./node_modules/three/build/three.module.js" } }
+    </script>
     <script type="module" src="./js/3d.js"></script>
   </body>
 </html>

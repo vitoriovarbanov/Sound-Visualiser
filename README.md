@@ -19,4 +19,5 @@ on the first click of the play button (browser autoplay policy).
 
 - `index.html` + `styles.css` — the player overlay (markup + theme)
 - `js/3d.js` — the Three.js visualiser and audio/transport logic
-- `assets/test.mp3` — the bundled track
+- `assets/visualise.webm` — the bundled track (Opus 96k, ~4.8 MB)
+- `assets/visualise.mp3` — mp3 fallback for Safari < 15
