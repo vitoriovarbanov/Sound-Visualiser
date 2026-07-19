@@ -3,11 +3,37 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Document</title>
+    <title>Sound Visualiser</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
 
   <body>
+    <div class="player" id="player">
+      <div class="top">
+        <div class="head">
+          <p class="label red">Sound Visualiser</p>
+          <p class="label ink">Track 01 / 01</p>
+        </div>
+        <h1 class="masthead">test<br />.mp3</h1>
+      </div>
+
+      <div class="foot">
+        <button class="pp" id="pp" aria-label="Play" disabled>
+          <svg class="i-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+          <svg class="i-pause" viewBox="0 0 24 24">
+            <rect x="6" y="5" width="4" height="14" />
+            <rect x="14" y="5" width="4" height="14" />
+          </svg>
+        </button>
+        <span class="time" id="cur">0:00</span>
+        <div class="seek" id="seek">
+          <span class="fill" id="fill"></span>
+          <span class="knob" id="knob"></span>
+        </div>
+        <span class="time" id="tot">0:00</span>
+      </div>
+    </div>
+
     <script type="module" src="./js/3d.js"></script>
   </body>
 </html>

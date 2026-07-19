@@ -29,22 +29,36 @@ import in `js/3d.js`.
 
 ## Architecture
 
-The whole app is `js/3d.js`, loaded via the single `<script type="module">` tag in
-`index.html`. It's a Three.js scene that visualises audio:
+Two pieces working together:
 
-- Audio loads through `THREE.AudioLoader` / `THREE.Audio` and is analysed with
-  `THREE.AudioAnalyser`.
-- `buildSpiral()` creates the sphere meshes **once** along an Archimedean spiral.
-- `animate()` samples `analyser.getFrequencyData()` every frame and drives each sphere's
-  scale and HSL color from its frequency bin. This build-once / mutate-per-frame split is
-  the core pattern — do not recreate meshes inside the loop.
+- **`index.html` + `styles.css`** — a fixed-position "Swiss" player overlay (`#player`):
+  editorial cream/ink/vermilion theme, condensed-Helvetica masthead, and a bottom
+  transport (play/pause `#pp`, hairline seek `#seek`, times `#cur`/`#tot`). This is just
+  markup + CSS; all behaviour is wired from `3d.js`.
+- **`js/3d.js`** — the Three.js visualiser *and* the audio/transport logic. It imports
+  Three from `../node_modules/three/src/Three.js` directly (hence `npm install` is
+  required) and appends its own `renderer.domElement`, which sits behind the overlay
+  (`canvas { z-index: 0 }`, `.player { z-index: 2 }`).
 
-It imports Three from `../node_modules/three/src/Three.js` directly (hence `npm install`
-is required) and appends its own `renderer.domElement` to the body — `index.html` is just
-a bare shell that loads the module.
+Visualiser core (a **Sunburst** — radial bars forming a circular equaliser):
+- Audio loads through `THREE.AudioLoader` / `THREE.Audio`, analysed with `THREE.AudioAnalyser`.
+- `buildSunburst()` creates the bar meshes **once** around a circle (thin `PlaneGeometry`
+  translated so scaling `.y` grows each bar outward from the inner ring). `buildBands()`
+  gives one log-spaced band per side; `bandForBar()` mirrors it around the circle so
+  adjacent bars share a frequency (no seam discontinuity).
+- `animate()` samples `analyser.getFrequencyData()` every frame, smooths per bar (fast
+  attack / slow release via `levels`), and drives each bar's length + color (ink→vermilion
+  lerp) from its band. Build-once / mutate-per-frame is the core pattern — do not recreate
+  meshes inside the loop.
 
-**Browser autoplay policy:** the audio — and therefore the animation — only reacts once
-the AudioContext is unblocked by a user gesture (any click/keypress on the page).
+Transport wiring (in `3d.js`): `position` (seconds) is the single source of truth for the
+playhead; `headPos()` adds live `AudioContext` time while playing. `play()` always
+`sound.stop()`s first so `sound.offset` alone sets the start point (keeps our bookkeeping
+authoritative); seeking restarts from the new `position`. `animate()` updates the DOM
+transport and resets to paused at end-of-track.
+
+**Browser autoplay policy:** playback starts on the first click of the play button (a user
+gesture), which also resumes the suspended `AudioContext`. There is no auto-play.
 
 ## Notes
 

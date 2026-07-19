@@ -6,9 +6,15 @@ function main() {
     const camera = new THREE.PerspectiveCamera(85, window.innerWidth / window.innerHeight, 0.1, 1000)
     camera.position.z = 10
 
-    const renderer = new THREE.WebGLRenderer()
+    const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setSize(window.innerWidth, window.innerHeight)
+    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio))
+    renderer.setClearColor(0xf2f0ea, 1)   // Swiss cream ground
     document.body.appendChild(renderer.domElement)
+
+    // Sphere palette: ink at rest, warming to vermilion on loud bands.
+    const inkColor = new THREE.Color(0x15120e);
+    const redColor = new THREE.Color(0xe5352b);
 
     const fftSize = 2048
     const listener = new THREE.AudioListener()
@@ -16,32 +22,87 @@ function main() {
     const sound = new THREE.Audio(listener)
     const audioLoader = new THREE.AudioLoader()
 
+    // ---- transport state ----
+    const audioCtx = listener.context;
     let ready = false;
+    let duration = 0;
+    let playing = false;
+    let position = 0;    // playhead (s) when not actively counting
+    let startedAt = 0;   // audioCtx time when the current play segment began
+
+    // ---- transport controls (Swiss player in index.html) ----
+    const player = document.getElementById('player');
+    const pp = document.getElementById('pp');
+    const seek = document.getElementById('seek');
+    const fill = document.getElementById('fill');
+    const knob = document.getElementById('knob');
+    const curEl = document.getElementById('cur');
+    const totEl = document.getElementById('tot');
+
+    const fmt = (s) => {
+        s = Math.max(0, Math.floor(s || 0));
+        return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+    };
+    // Live playhead: add the elapsed context time while a segment is playing.
+    const headPos = () => {
+        const p = playing ? position + (audioCtx.currentTime - startedAt) : position;
+        return Math.max(0, Math.min(duration, p));
+    };
+
     audioLoader.load('../assets/test.mp3', function (buffer) {
         sound.setBuffer(buffer);
         sound.setVolume(1);
+        duration = buffer.duration;
+        totEl.textContent = fmt(duration);
         ready = true;
+        pp.disabled = false;
     })
 
-    // Browsers block audio until the user interacts with the page (autoplay policy).
-    // Start playback — and resume the AudioContext — on the first click or key press.
-    const hint = document.createElement('div');
-    hint.textContent = 'click anywhere to play';
-    hint.style.cssText =
-        'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;' +
-        'font:600 24px sans-serif;color:#fff;background:rgba(0,0,0,.6);cursor:pointer;z-index:10';
-    document.body.appendChild(hint);
-
-    function startAudio() {
-        if (!ready || sound.isPlaying) return;
-        if (listener.context.state === 'suspended') listener.context.resume();
-        sound.play();
-        hint.remove();
-        window.removeEventListener('click', startAudio);
-        window.removeEventListener('keydown', startAudio);
+    function setPlaying(state) {
+        playing = state;
+        player.classList.toggle('is-playing', state);
+        pp.setAttribute('aria-label', state ? 'Pause' : 'Play');
     }
-    window.addEventListener('click', startAudio);
-    window.addEventListener('keydown', startAudio);
+
+    // Always stop() before starting so THREE.Audio's internal progress resets to 0
+    // and `sound.offset` alone sets the start point — our `position` stays the single
+    // source of truth for the playhead. The first click also satisfies the browser
+    // autoplay policy by resuming the suspended AudioContext.
+    function play() {
+        if (!ready) return;
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        if (position >= duration) position = 0;
+        try { sound.stop(); } catch (e) { /* no source yet */ }
+        sound.offset = position;
+        sound.play();
+        startedAt = audioCtx.currentTime;
+        setPlaying(true);
+    }
+
+    function pause() {
+        position = headPos();
+        try { sound.stop(); } catch (e) { /* already stopped */ }
+        setPlaying(false);
+    }
+
+    pp.addEventListener('click', () => (playing ? pause() : play()));
+
+    // Click the hairline to scrub.
+    seek.addEventListener('click', (e) => {
+        if (!ready) return;
+        const r = seek.getBoundingClientRect();
+        position = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) * duration;
+        if (playing) play();   // restart from the new position
+        else updateTransport();
+    });
+
+    function updateTransport() {
+        const p = headPos();
+        const ratio = duration ? p / duration : 0;
+        fill.style.width = (ratio * 100) + '%';
+        knob.style.left = (ratio * 100) + '%';
+        curEl.textContent = fmt(p);
+    }
 
     const analyser = new THREE.AudioAnalyser(sound, fftSize);
 
@@ -64,43 +125,42 @@ function main() {
         });
     }
 
-    const radius = 0.15;
-    const sides = 100;
-    const coils = 555;
-    const rotation = 0; // ('0'=no rotation, '1'=360 degrees, '180/360'=180 degrees)
+    // ---- Sunburst: radial bars forming a circular equaliser ----
+    const BARS = 72;
+    const HALF = BARS / 2;       // spectrum runs low→high→low, mirrored around the circle
+    const innerRadius = 1.8;     // still ring the bars grow out from
+    const barWidth = 0.06;       // world units
+    const baseLen = 0.12;        // bar length at rest
+    const maxLen = 3.2;          // added length at full amplitude
 
-    const geometry = new THREE.SphereGeometry(radius)
+    // A unit bar whose base sits at the local origin and extends up +Y, so scaling Y
+    // grows it radially outward from the inner ring.
+    const barGeo = new THREE.PlaneGeometry(barWidth, 1);
+    barGeo.translate(0, 0.5, 0);
 
-    // Build the spiral ONCE, keeping a reference to every sphere so the animation
-    // loop can mutate them instead of recreating them each frame.
-    const spheres = buildSpiral(0, 0, radius, sides, coils, rotation);
-    const bands = buildBands(spheres.length);
+    const bars = buildSunburst(BARS, innerRadius);
+    // One band per side; mirrored so adjacent bars share a frequency (no seam jump).
+    const bands = buildBands(HALF + 1);
+    const bandForBar = (j) => (j <= HALF ? j : BARS - j);
+    // Per-bar smoothed level (fast attack, slow release) so bars pulse, not jitter.
+    const levels = new Float32Array(BARS);
 
-    function makeInstance(color, posX, posY) {
-        const material = new THREE.MeshBasicMaterial({ color })
-        const sphere = new THREE.Mesh(geometry, material)
+    // Faint guide ring at the inner radius.
+    scene.add(new THREE.Mesh(
+        new THREE.RingGeometry(innerRadius - 0.05, innerRadius - 0.01, 96),
+        new THREE.MeshBasicMaterial({ color: 0x15120e, transparent: true, opacity: 0.1 })
+    ));
 
-        sphere.position.x = posX;
-        sphere.position.y = posY;
-        scene.add(sphere)
-        return sphere
-    }
-
-    // Arrange `sides` spheres along an Archimedean spiral and return them in order,
-    // so index 0 is at the center and the last index is at the outer edge.
-    function buildSpiral(centerX, centerY, radius, sides, coils, rotation) {
-        const awayStep = radius / sides;              // radial step per sphere
-        const aroundStep = coils / sides;             // angular step per sphere (turns)
-        const aroundRadians = aroundStep * 2 * Math.PI;
-        const rotationRadians = rotation * 2 * Math.PI;
-
+    // Place `count` bars evenly around the circle, each pointing radially outward.
+    function buildSunburst(count, r0) {
         const created = [];
-        for (let i = 1; i <= sides; i++) {
-            const away = i * awayStep;
-            const around = i * aroundRadians + rotationRadians;
-            const x = centerX + Math.cos(around) * away * 50;
-            const y = centerY + Math.sin(around) * away * 50;
-            created.push(makeInstance(0x44aa88, x, y));
+        for (let j = 0; j < count; j++) {
+            const angle = (j / count) * Math.PI * 2;
+            const bar = new THREE.Mesh(barGeo, new THREE.MeshBasicMaterial({ color: 0x15120e }));
+            bar.rotation.z = angle - Math.PI / 2;   // aim the bar's +Y axis outward
+            bar.position.set(Math.cos(angle) * r0, Math.sin(angle) * r0, 0);
+            scene.add(bar);
+            created.push(bar);
         }
         return created;
     }
@@ -112,17 +172,30 @@ function main() {
         // fills and returns the byte-frequency array (0..255 per bin).
         const data = analyser.getFrequencyData();
 
-        spheres.forEach((sphere, i) => {
-            // Average this sphere's log-spaced band, then normalise to 0..1.
-            const [start, end] = bands[i];
+        for (let j = 0; j < bars.length; j++) {
+            // Average this bar's log-spaced band, then normalise to 0..1.
+            const [start, end] = bands[bandForBar(j)];
             let sum = 0;
             for (let b = start; b < end; b++) sum += data[b];
             const amplitude = sum / (end - start) / 255;
 
-            // Louder bins => larger, brighter spheres.
-            sphere.scale.setScalar(0.5 + amplitude * 6);
-            sphere.material.color.setHSL(0.45 - amplitude * 0.45, 0.7, 0.3 + amplitude * 0.4);
-        });
+            // Smooth per bar: snap up on transients, ease back down. Calmer than raw data.
+            const s = levels[j] + (amplitude - levels[j]) * (amplitude > levels[j] ? 0.5 : 0.12);
+            levels[j] = s;
+
+            const bar = bars[j];
+            bar.scale.y = baseLen + s * maxLen;   // grow outward from the inner ring
+            // Ink at rest, warming to vermilion on loud bands (squared so only peaks pop).
+            bar.material.color.copy(inkColor).lerp(redColor, Math.min(1, s * s * 1.8));
+        }
+
+        // Reached the end — reset to the start, paused.
+        if (playing && headPos() >= duration - 0.03) {
+            try { sound.stop(); } catch (e) { /* already stopped */ }
+            position = 0;
+            setPlaying(false);
+        }
+        updateTransport();
 
         renderer.render(scene, camera);
     }
